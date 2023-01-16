@@ -1,0 +1,5 @@
+acción
+emoción
+tracción
+función
+sección

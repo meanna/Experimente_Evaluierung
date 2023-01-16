@@ -1,0 +1,28 @@
+ToDos
+
+- install transducer from https://github.com/santhoshtr/sfst and test with a small lexicon file
+
+- 2 lexicon files (verb, noun) with a lemma per line (3*5 total lemmas): Leah
+
+- code to recognize different forms of a given word (input). sample implementation below. see slide 44-45
+
+    > fst-compiler-utf8 morph.fst morph.a
+    > fst-mor morph.a
+    analyze> lobbies
+    lobby<N><pl>
+
+    analyze> stores
+    store<N><pl>
+    analyze> houses
+    house<N><pl>
+    analyze>
+
+    generate> house<N><pl>
+    houses
+    generate> house<N><sg>
+    house
+
+    Note: in 'analyze' mode, the transducer runs backwards (end to start). 'lobby' <- 'lobbies', 'store' <- 'stores'
+
+    - possible steps:
+       - start working with code from 44 (if input is 'lobbies', map

@@ -1,0 +1,167 @@
+- mindestens 3 Flexionsklassen aus mindestens 2 Wortarten. 5 Stammlexikon-Einträgen für jede Flexionsklasse
+
+-------------
+references:
+https://www.datsi.fi.upm.es/~coes/publications/sepln.pdf
+https://conjugator.reverso.net/conjugation-spanish.html
+http://roa.rutgers.edu/files/766-0805/766-BERMUDEZ-OTERO-0-0.PDF
+https://www.colanguage.com/spanish-diminutives-ito-and-augmentatives-ote
+http://olst.ling.umontreal.ca/pdf/Mel'čuk_2013_Spanish%20Gender.pdf
+-----------------
+
+##Verbs##
+
+class 1: -er class
+
+('to eat' -> comer)
+1sg	como
+2sg	comes
+3sg	come
+1pl	comemos
+2pl	coméis
+3pl	comen
+
+('to learn' -> aprender)
+1sg	aprendo
+2sg	aprendes
+3sg	aprende
+1pl	aprendemos
+2pl	aprendéis
+3pl	aprenden
+
+('to understand' -> comprender)
+1sg	comprendo
+2sg	comprendes
+3sg	comprende
+1pl	comprendemos
+2pl	comprendéis
+3pl	comprenden
+
+('to drink' -> beber)
+1sg	bebo
+2sg	bebes
+3sg	bebe
+1pl	bebemos
+2pl	bebéis
+3pl	beben
+
+('to read' -> leer)
+1sg	leo
+2sg	lees
+3sg	lee
+1pl	leemos
+2pl	leéis
+3pl	leen
+
+
+class 2: -ar class
+
+('to cook' -> cocinar)
+1sg cocino
+2sg cocinas
+3sg cocina
+1pl cocinamos
+2pl cocináis
+3pl cocinan
+
+('to work' -> trabajar)
+1sg	trabajo
+2sg	trabajas
+3sg	trabaja
+1pl	trabajamos
+2pl	trabajáis
+3pl	trabajan
+
+('to buy' -> comprar)
+1sg	compro
+2sg	compras
+3sg	compra
+1pl	compramos
+2pl	compráis
+3pl	compran
+
+('to dance' -> bailar)
+1sg	bailo
+2sg	bailas
+3sg	baila
+1pl	bailamos
+2pl	bailáis
+3pl	bailan
+
+('to love' -> amar)
+1sg 	amo
+2sg	amas
+3sg	ama
+1pl	amamos
+2pl	amáis
+3pl	aman
+
+
+##Nouns##
+
+class 3: -s class
+
+('house' -> casa)
+sg  casa
+pl  casas
+
+('word' -> palabra)
+sg  palabra
+pl  palabras
+
+('table' -> mesa)
+sg mesa
+pl mesas
+
+('grandmother' -> abuela)
+sg abuela
+pl abuelas
+
+('spoon' -> cuchara)
+sg cuchara
+pl cucharas
+
+('room' -> cuarto)
+sg cuarto
+pl cuartos
+
+('hand' -> mano)
+sg mano
+pl manos
+
+('theater' -> teatro)
+sg teatro
+pl teatros
+
+('book' -> libro)
+sg libro
+pl libros
+
+('plate' -> plato)
+sg plato
+pl platos
+
+
+class4: replace accent ó with o in plural form
+
+sg acción
+pl acciones
+
+sg emoción
+pl emociones
+
+sg tracción
+pl tracciones
+
+sg función
+pl funciones
+
+pl sg sección
+pl secciones
+
+
+class 5: Diminutives (-ito, -ita class)
+
+-ito (masc), -ita (fem)
+'plate' -> plato -> platito (diminutive, masc)
+'spoon' -> cuchara -> cucharita (diminutive, fem)
