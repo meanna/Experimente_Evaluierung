@@ -1,178 +1,94 @@
+import torch
+from torch import nn
+from itertools import combinations
 
-class Parser:
 
-    def read_from_file(self, filepath):
+class Parser(nn.Module):
+    def __init__(self, seq_len,
+                 vocab_size,
+                 embedding_dim,
+                 char_lstm_hidden,
+                 char_lstm_num_layers,
+                 word_lstm_hidden,
+                 word_lstm_num_layers,
+                 num_classes):
+        super(Parser, self).__init__()
 
-        with open(filepath, 'r') as file:
-            for line in file:
-                tree = line.strip()
-                constituents, words = self.parse_a_tree(tree)
+        self.char_lstm_hidden = char_lstm_hidden
+        self.word_lstm_hidden = word_lstm_hidden
+        self.seq_len = seq_len
+        self.embeddings_dim = embedding_dim
+        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
+        self.rnn_prefix = nn.LSTM(input_size=embedding_dim, hidden_size=char_lstm_hidden,
+                                  num_layers=char_lstm_num_layers, batch_first=True)
+        self.rnn_suffix = nn.LSTM(input_size=embedding_dim, hidden_size=char_lstm_hidden,
+                                  num_layers=char_lstm_num_layers, batch_first=True)
+        self.word_lstm = nn.LSTM(input_size=char_lstm_hidden * 2, hidden_size=word_lstm_hidden,
+                                 num_layers=word_lstm_num_layers, bidirectional=True, batch_first=True)
+        self.linear = nn.Linear(in_features=word_lstm_hidden * 2, out_features=num_classes)
 
-                # To test if the parse works properly
-                # It can handle trees with chain rules that are longer than 2 rules
+    def forward(self, prefix, suffix):
+        prefix = self.embeddings(prefix)
+        suffix = self.embeddings(suffix)
 
-                # recon_tree = self.reconstruct_a_tree(constituents, words)
-                # print("tree")
-                # print(tree)
-                # print("recon")
-                # print(recon_tree)
-                # print("..."*10)
-                # assert tree == recon_tree
+        # create the tensor (N+2, 2*H1)
+        sentence = []
 
-                yield constituents, words
+        # for each word, pass its suffix and prefix into a separate lstm
+        # and concatenate the outputs.
+        # put zero vectors at the sentence beginning and ending of the sentence tensor.
+        zero = torch.zeros((2 * self.char_lstm_hidden))
+        sentence.append(zero)
+        for i in range(len(prefix)):
+            _, (h_prefix, _) = self.rnn_prefix(prefix[i].unsqueeze(0))
+            _, (h_suffix, _) = self.rnn_suffix(suffix[i].unsqueeze(0))
+            prefix_and_suffix = torch.cat((h_prefix.squeeze(), h_suffix.squeeze()), 0)
+            sentence.append(prefix_and_suffix)
+        sentence.append(zero)
+        sentence_tensor = torch.stack(sentence)
 
-    def parse_a_tree(self, tree):
-        result, words, _ = self.process_parse(tree, constituents=[], words=[], i=0)
-        result = self.remove_chain_rules(result)
-        return result, words
+        # out dim = (batch, N+2, H2*2)
+        out, _ = self.word_lstm(sentence_tensor.unsqueeze(dim=0))
 
-    def reconstruct_a_tree(self, constituents, words):
-        constituents = self.expand_to_chain_rules(constituents)
-        tree, _, _ = self.get_parse(constituents, words)
-        return tree
+        # remove the last word
+        forward_hidden_states = out[:, :-1, :self.word_lstm_hidden].squeeze()  # (N,H2)
+        # remove the first word
+        backward_hidden_states = out[:, 1:, self.word_lstm_hidden:].squeeze()  # (N,H2)
 
-    @staticmethod
-    def read_token(parse, pos):
-        token = ""
-        i = 0
-        while parse[pos + i] not in ["(", ")", " "]:
-            token += parse[pos + i]
-            i += 1
-        return token, pos + i
+        # compute all spans, and put them into a tensor
+        spans = list(combinations(range(self.seq_len + 1), 2))
+        span_list = []
+        for start, end in spans:
+            span = torch.cat((forward_hidden_states[end] - forward_hidden_states[start],
+                              backward_hidden_states[start] - backward_hidden_states[end]))
+            span_list.append(span)
 
-    def process_parse(self, parse, constituents, words, i):
-        """
-        Given a parse tree, return a list of unsorted constituents, list of words,
-        and i is the current position in the parse string.
-        > parse = "(TOP(S(NP(NNP Ms.)(NNP Haag))(VP(VBZ plays)(NP(NNP Elianti)))(. .)))"
+        span_tensors = torch.stack(span_list)  # (num_spans, 2*H2)
+        scores = self.linear(span_tensors)  # (num span, num class)
 
-        output constituents: [('DT', 0, 1), ('NN', 1, 2), ('NN', 2, 3) .. ]
-        output words: ['Ms.', 'Haag', 'plays', 'Elianti', '.']
+        return scores
 
-        """
-        start = len(words)
-        while i < len(parse):
-            # if see (, call the function recursively
-            # if not, read the token until seeing a space or )
-            if parse[i] == "(":
-                i += 1
-                result_list, _, i = self.process_parse(parse, constituents, words, i)
-                constituents += result_list
-
-            # if see a space, it means, we just read a label
-            elif parse[i] == " ":
-                label = token
-                i += 1
-
-            elif parse[i] == ")":
-                # if the previous position is not ), we just read a word
-                # otherwise, it is a label
-                # e.g.  (..(N car))
-                if parse[i - 1] != ")":
-                    word = token
-                    words.append(word)
-                else:
-                    label = token
-                end = len(words)
-                i += 1
-                return [(label, start, end)], words, i
-            else:
-                token, i = self.read_token(parse, i)
-
-        return constituents, words, i
-
-    @staticmethod
-    def expand_to_chain_rules(constituents):
-        """
-        Given a constituent list without chain rules,
-        e.g. [('TOP=S', 0, 5), ..]
-        Return a new list where the modified rules are expanded back to chain rules
-        e.g. [('TOP', 0, 5), ('S', 0, 5), ..]
-        """
-        new_list = []
-        for label, start, end in constituents:
-            if "=" in label:
-                label1, label2 = label.split("=")
-                new_list.append((label1, start, end))
-                new_list.append((label2, start, end))
-            else:
-                new_list.append((label, start, end))
-        return new_list
-
-    def get_parse(self, constituents, words):
-        """
-        Given constituent list (in depth first traversal order, and with chain rules)
-        and a word list, return the parse tree as string.
-        > constituents= [('TOP', 0, 5), ('S', 0, 5), ('NP', 0, 2), ('NNP', 0, 1) ..]
-        > words= ['Ms.', 'Haag', 'plays', 'Elianti', '.']
-
-        output = "(TOP(S(NP(NNP Ms.)(NNP Haag))(VP(VBZ plays)(NP(NNP Elianti)))(. .)))"
-
-        """
-        if constituents:
-            out = ""
-            # handle chain rule e.g.
-            if_chain_rule = False
-            label, start, end = constituents[0]
-            if constituents[1:]:
-                label1, start1, end1 = constituents[1]
-                if start == start1 and end == end1:
-                    if_chain_rule = True
-            if if_chain_rule:
-                out += "(" + label
-                constituents = constituents[1:]
-                child, ind, constituents = self.get_parse(constituents, words)
-                out += child + ")"
-                return out, end, constituents
-            else:
-                # if the node has children
-                if end != start + 1:
-                    out += "(" + label
-                    ind = start
-                    constituents = constituents[1:]
-                    while ind < end:
-                        child, ind, constituents = self.get_parse(constituents, words)
-                        out += child
-                    out += ")"
-                    return out, end, constituents
-                # if the node does not have any children
-                else:
-                    out += "(" + label + " " + words[start] + ")"
-                    return out, end, constituents[1:]
-
-    @staticmethod
-    def remove_chain_rules(constituents):
-        """
-        Sort the given constituent list to have an order of depth first traversal.
-        Remove chain rules from the given constituent list.
-        input e.g. [('TOP', 0, 5), ('S', 0, 5), ('NP', 0, 2), ('NNP', 0, 1) .. ]
-        output e.g. [('TOP=S', 0, 5), ('NP', 0, 2), ('NNP', 0, 1), ..]
-
-        """
-        constituents = sorted(constituents, key=lambda x: (x[1], -x[2]))
-        final_constituents = []
-        i = 0
-
-        while i < len(constituents) - 1:
-            label, start, end = constituents[i]
-            next_label, next_start, next_end = constituents[i + 1]
-            if next_start == start and next_end == end:
-                con = (next_label + "=" + label, start, end)
-                final_constituents.append(con)
-                i += 1
-            else:
-                final_constituents.append((label, start, end))
-            i += 1
-
-        # if second and third elements from the back of the list are merged due to chain rule
-        # append the last element to the list
-        # e.g. [ ...  ,('VBZ', 2, 3), ('VBZ', 2, 3), ('.', 4, 5)]
-        if i < len(constituents):
-            final_constituents.append(constituents[-1])
-        return final_constituents
 
 if __name__ == "__main__":
-    p = Parser()
-    outputs = p.read_from_file(filepath="./PennTreebank/data/train.txt")
+    vocab_size = 25
+    sentence_length = 10
+    prefix_length = 6
+    num_classes = 15
 
-    print(next(outputs))
+    # tensor of prefix (character IDs)
+    prefix = torch.randint(low=0, high=vocab_size, size=(sentence_length, prefix_length))
+
+    # tensor of suffix (character IDs)
+    # assume suffix is already reversed.
+    suffix = torch.randint(low=0, high=vocab_size, size=(sentence_length, prefix_length))
+
+    net = Parser(seq_len=sentence_length,
+                 vocab_size=vocab_size,
+                 embedding_dim=4,
+                 char_lstm_hidden=8,
+                 char_lstm_num_layers=1,
+                 word_lstm_hidden=12,
+                 word_lstm_num_layers=1,
+                 num_classes=num_classes)
+    out = net(prefix, suffix)
+    print(out.shape)
