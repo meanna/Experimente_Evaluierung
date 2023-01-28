@@ -250,6 +250,18 @@ prompt_options = ["your idea",
 #                     "a drawing of a birthday cake",
 #                     "a watercolor drawing of a mom cooking"]
 
+
+improve_text_options_dict = {"correct grammar": "Correct grammar mistakes in this text:",
+                             "summarize": "Summarize this text:",
+                             "reformulate": "Reformulate this text:",
+                             "make it formal": "Make this text more formal:",
+                             "make it funny": "Make this text funny:",
+                             "make it informal": "Make this text more informal:",
+                             "make it shorter": "Make this text shorter:",
+                             "make it longer": "Make this text longer:"}
+
+improve_text_options = ["No, I do not want to change my message."] + list(improve_text_options_dict)
+
 story_example = " Example1: 'I want to create a card for my mom. I love her so much." \
                 " She likes to cook for me. She is the best cook I know.'\n" \
                 " Example2: 'I want a birthday card for my mom. She likes dogs.'\n\n" \
@@ -258,6 +270,7 @@ story_example = " Example1: 'I want to create a card for my mom. I love her so m
 thank_you_message = "Thank you for using AICA:)"
 # good_bye_response = "We are finished! Enjoy." + thank_you_message
 
+poem_options = ["Yes, I like it.", "No, I want to use my message."]
 good_bye_response = "The message is added to your card so we are finished now. Enjoy! " + thank_you_message
 
 good_bye_response_poem = "The poem is added to your card so we are finished now. Enjoy! " + thank_you_message
@@ -323,6 +336,37 @@ def suggest_title(story, card_type, tone="funny", use_gpt3=False):
         return results
 
     return card_type_to_title[card_type]
+
+
+def improve_text(input_text, goal):
+    if not input_text:
+        return input_text
+
+    prompt = f"{input_text}. {improve_text_options_dict[goal]}"
+    print(prompt)
+    model = gpt3
+    max_tokens = 200
+    num_texts = 1
+    completion = openai.Completion.create(
+        engine=model,
+        prompt=prompt,
+        n=num_texts,
+        temperature=0.5,
+        max_tokens=max_tokens,
+        top_p=1.0,
+        frequency_penalty=0.0,
+        presence_penalty=0.0
+    )
+    # results = [completion.choices[i].text.strip() for i in range(num_texts)]
+    result = completion.choices[0].text.strip()
+
+    return result
+
+
+# input_text = "Before social media filters, there were Victorian headless portraits.In late 19th century Britain,
+# a photo trend portrayed a model's head separated from the body. The sitter would often be holding their head"
+# r = improve_text(input_text, "make it informal")
+# print([r])
 
 
 # r = suggest_title("", "graduation", tone="funny", use_gpt3=True)
@@ -620,6 +664,7 @@ def chatbot(message, cards):
 
     elif bot_actions[-1] == "user_gave_story":
         # use story to suggest
+
         if message == "1":  # use AICa suggestion
             # this returns card_type_to_title[card_type]
             title_suggestions = suggest_title(message, card_spec["type"]) + ["your idea"]
@@ -646,6 +691,7 @@ def chatbot(message, cards):
                 seed = cards[-1][1]
                 card = cards[-1][0]
                 title = title_suggestions[int(message) - 1]
+                card_spec["title"] = title
                 # card_with_title = (add_title(card, title), seed)  # todo
                 cards = get_cards_with_diff_title_styles(card, title, seed)  # todo
 
@@ -658,8 +704,10 @@ def chatbot(message, cards):
             user_choices = enum_list(title_suggestions)
 
     elif bot_actions[-1] == "user_gave_title":
+
         seed = cards[-1][-1]
         title = message
+        card_spec["title"] = title
         card = cards[-1][0]
         # card_with_title = (add_title(card, title), seed)  # todo
         cards = get_cards_with_diff_title_styles(card, title, seed)  # generate_cards("") #[card_with_title]
@@ -716,7 +764,7 @@ def chatbot(message, cards):
                                "this story." \
                                " Please type any key to proceed."
                 bot_actions.append("user_gave_story_for_message")
-            elif message == "2":  # opem
+            elif message == "2":  # poem
                 response = "You want to generate a poem? Sure, then type in a few keywords or a story."
                 user_choices = ["For example,"] + add_bullet_points(story_suggestions[card_spec["type"]])
                 bot_actions.append("user_wants_poem")
@@ -754,13 +802,66 @@ def chatbot(message, cards):
             user_choices = enum_list(card_spec["poems"])
 
     elif bot_actions[-1] == "user_gave_message":
+
         card_spec["message"] = message
-        current_card = cards[-1][0]
-        new_image = add_message(current_card, card_spec["recipient"], card_spec["sender"], message)
-        seed = cards[-1][-1]
-        cards = [(new_image, seed)]
-        response = good_bye_response
-        bot_actions.append("final")
+
+        response = "Do you want to use our text improving service?" \
+                   " See what you can do on the right pane." \
+                   " Type a number to pick the next action."
+        user_choices = enum_list(improve_text_options)
+        bot_actions.append("improve_message")
+
+
+
+    elif bot_actions[-1] == "improve_message":
+
+        options = range(1, len(improve_text_options) + 1)
+        if message in [str(num) for num in options]:
+            if message == "1":  # No, I do not want to change my message
+                bot_actions.append("add_message_to_card")
+
+            else:
+                goal = improve_text_options[int(message) - 1]
+                # text_improve_goal = improve_text_options_dict[goal]
+                new_text = improve_text(card_spec["message"], goal)
+                card_spec["improved_text"] = new_text
+                response = "We've adjusted your text. You can see the result on the right pane." \
+                           " Tell us if you like it and choose the next step."
+                user_choices = ["Result:"] + [new_text] + ["---" * 20] + ["Next steps:"] + enum_list(poem_options)
+                bot_actions.append("after_improve_text")
+        else:
+            response = f"Please choose a number listed in the option box."
+            user_choices = enum_list(improve_text_options)
+
+    elif bot_actions[-1] == "after_improve_text":
+        options = range(1, len(poem_options) + 1)
+        if message in [str(num) for num in options]:
+            if message == "1":  # Yes, I like it.
+                new_text = card_spec["improved_text"]
+                card_spec["message"] = new_text
+                current_card = cards[-1][0]
+                new_image = add_message(current_card, card_spec["recipient"], card_spec["sender"],
+                                        card_spec["message"])
+                seed = cards[-1][-1]
+                cards = [(new_image, seed)]
+                response = good_bye_response
+                bot_actions.append("final")
+            elif message == "2":  # No, I want to use my message
+                bot_actions.append("user_gave_message")
+                response = "Do you want to use our text improving service?" \
+                           " See what you can do on the right pane." \
+                           " Type a number to pick the next action."
+                user_choices = enum_list(improve_text_options)
+                bot_actions.append("improve_message")
+
+        else:
+            response = f"Please choose a number listed in the option box."
+            user_choices = enum_list(poem_options)
+
+
+
+
+
 
     elif bot_actions[-1] == "user_gave_story_for_message":
 
@@ -802,7 +903,17 @@ def chatbot(message, cards):
         bot_actions.append("picked_best_card_with_title")
         user_choices = enum_list(card_variations_options)
 
+    if bot_actions[-1] == "add_message_to_card":
+        m = card_spec["message"]
+        current_card = cards[-1][0]
+        new_image = add_message(current_card, card_spec["recipient"], card_spec["sender"], m)
+        seed = cards[-1][-1]
+        cards = [(new_image, seed)]
+        response += good_bye_response
+        bot_actions.append("final")
+
     if not response:
+        print(">>>>>>>>>")
         response = greeting
         bot_actions.append("greeting")
         user_choices = enum_list(card_types)
@@ -817,6 +928,8 @@ def chatbot(message, cards):
     sender_str = card_spec['sender'] if 'sender' in card_spec else no_value
     recipient_str = card_spec['recipient'] if 'recipient' in card_spec else no_value
     user_prompt_str = card_spec['user_prompt'] if 'user_prompt' in card_spec else no_value
+    message_str = card_spec['message'] if 'message' in card_spec else no_value
+    card_title_str = card_spec['title'] if 'title' in card_spec else no_value
 
     user_info = [
 
@@ -824,8 +937,8 @@ def chatbot(message, cards):
         f"Sender name: {sender_str}",
         f"Recipient name: {recipient_str}",
         f"Image prompt: {user_prompt_str}",
-        # f"Card title: {card_spec['title']}",
-        # f"Card message: {card_spec['message']}",
+        f"\nCard title: {card_title_str}",
+        f"Card message: \n{message_str}",
     ]
 
     user_info = "\n".join(user_info)
