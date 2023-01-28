@@ -129,6 +129,8 @@ def add_prompt_extra(prompt):
 with open('fonts.json', encoding='utf8') as f:
     font_dict = json.load(f)
 
+#
+
 title_fonts = font_dict["title_fonts"]
 msg_fonts = font_dict["msg_fonts"]
 
@@ -137,6 +139,9 @@ with open('prompt_suggestions.json', encoding='utf8') as f:
 
 with open('story_suggestions.json', encoding='utf8') as f:
     story_suggestions = json.load(f)
+
+with open('image_styles.json', encoding='utf8') as f:
+    image_styles = json.load(f)
 
 
 def add_border_title(img, title, font, font_size=50, color="white"):
@@ -260,7 +265,8 @@ improve_text_options_dict = {"correct grammar": "Correct grammar mistakes in thi
                              "make it shorter": "Make this text shorter:",
                              "make it longer": "Make this text longer:"}
 
-improve_text_options = ["No, I do not want to change my message."] + list(improve_text_options_dict)
+improve_text_options = ["No, I do not want to change my message."] + ["Change my message."] + list(
+    improve_text_options_dict)
 
 story_example = " Example1: 'I want to create a card for my mom. I love her so much." \
                 " She likes to cook for me. She is the best cook I know.'\n" \
@@ -468,8 +474,6 @@ def generate_poem(story, card_type):
 #
 # sys.exit()
 
-image_styles = {"warm": "warm", "pastel": "pastel", "anime": "anime", "formal": "formal", "davinci": "davinci",
-                "japanese": "japanese", "I don't want any style": ""}
 
 image_styles_options = list(image_styles)
 
@@ -820,6 +824,9 @@ def chatbot(message, cards):
             if message == "1":  # No, I do not want to change my message
                 bot_actions.append("add_message_to_card")
 
+            elif message == "2":  # change message
+                response = "Tell us what we should write under the card."
+                bot_actions.append("user_gave_message")
             else:
                 goal = improve_text_options[int(message) - 1]
                 # text_improve_goal = improve_text_options_dict[goal]
